@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace MatrixTranspose {
+    [DebuggerDisplay("{DebugString()}")]
     struct MatrixView {
         public int[,] Matrix;
         public int X;
@@ -30,7 +31,7 @@ namespace MatrixTranspose {
                 Debug.Assert(j + X < X + W);
                 Debug.Assert(i + Y < Y + H);
 
-                return ref Matrix[j + Y, i + Y];
+                return ref Matrix[j + X, i + Y];
             }
         }
 
@@ -40,78 +41,125 @@ namespace MatrixTranspose {
             return new MatrixView(Matrix, X + x, Y + y, w, h);
         }
 
-        public void Print() {
+        public string DebugString() {
+            var builder = new StringBuilder();
+
             for (int i = 0; i < H; i++) {
                 for (int j = 0; j < W; j++) {
-                    Console.Write($"{Matrix[i + Y, j + X]:00} ");
+                    builder.Append($"{Matrix[i + Y, j + X]:00} ");
                 }
-                Console.WriteLine();
+                builder.AppendLine();
             }
+
+            return builder.ToString();
+        }
+
+        public void Print() {
+            Console.Write(DebugString());
         }
     }
 
     class Program {
-        private static readonly int RecursionStopSize = 8;
+        static int[,] GenerateMatrix(int size) {
+            var mat = new int[size, size];
+
+            int value = 1;
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < size; j++) {
+                    mat[i, j] = value++;
+                }
+            }
+
+            return mat;
+        }
+
+        private static readonly int RecursionStopSize = 1;
 
         static void Main(string[] args) {
-            int k = 4;
-            var mat = new int[k, k];
+            Tests();
+
+            int k = 9;
+
+            var data = GenerateMatrix(k);
+            var mat = MatrixView.FromMatrix(data);
+
+            mat.Print();
+            //NaiveTranspose(new MatrixView(mat, 0, 0, 2, 2));
+            //CacheOblivousTranspose(new MatrixView(mat, 0, 0, 2, 2));
+            CacheOblivousTranspose(mat);
+            CacheOblivousTranspose(mat);
 
             int init = 1;
             for (int i = 0; i < k; i++) {
                 for (int j = 0; j < k; j++) {
-                    mat[i, j] = init++;
+                    Debug.Assert(data[i, j] == init++);
                 }
             }
-
-
-            var view = MatrixView.FromMatrix(mat);
-
-
-            view.Print();
-            NaiveTranspose(new MatrixView(mat, 0, 0, 2, 2));
 
             Console.WriteLine();
             Console.WriteLine("**********");
             Console.WriteLine();
-            view.Print();
+            mat.Print();
 
             //CacheOblivousTranspose(mat);
         }
 
-        private static void PrintMatrix(int[,] mat) {
-            for (int i = 0; i < mat.GetLength(0); i++) {
-                for (int j = 0; j < mat.GetLength(1); j++) {
-                    Console.Write($"{mat[i, j]} ");
+        private static void Tests() {
+            for (int k = 54; k < 120; k++) {
+                Console.WriteLine($"Testik {k}");
+                int size = (int) Math.Ceiling(Math.Pow(2, k / 9f));
+                var mat = GenerateMatrix(size);
+                var testMat = GenerateMatrix(size);
+
+                AssertEqualMatrix(mat, testMat);
+
+                CacheOblivousTranspose(MatrixView.FromMatrix(mat));
+                NaiveTranspose(MatrixView.FromMatrix(testMat));
+
+                AssertEqualMatrix(mat, testMat);
+            }
+        }
+
+        private static void AssertEqualMatrix(int[,] a, int[,] b) {
+            Debug.Assert(a.GetLength(0) == b.GetLength(0));
+            Debug.Assert(a.GetLength(1) == b.GetLength(1));
+
+            for (int i = 0; i < a.GetLength(0); i++) {
+                for (int j = 0; j < a.GetLength(1); j++) {
+                    Debug.Assert(a[i,j] == b[i, j]);
                 }
-                Console.WriteLine();
             }
         }
 
         private static void CacheOblivousTranspose(MatrixView mat) {
-            int leftW = mat.W / 2;
-            int rightW = mat.W - leftW;
+            if (EndRecursion(mat)) {
+                NaiveTranspose(mat);
+                return;
+            }
 
-            int leftH = mat.H / 2;
+            int smallW = mat.W / 2;
+            int bigW = mat.W - smallW;
 
+            int smallH = mat.H / 2;
+            int bigH = mat.H - smallH;
 
-            var topLeft = new MatrixView(mat.Matrix, 0, 0, leftW, leftH);
-            var bottomRight = new MatrixView(mat.Matrix, 0, 0, leftW, leftH);
+            var topLeft = mat.Sub(0, 0, smallW, smallH);
+            var bottomRight = mat.Sub(smallW, smallH, bigW, bigH);
 
             CacheOblivousTranspose(topLeft);
             CacheOblivousTranspose(bottomRight);
 
-            var bottomLeft = new MatrixView(mat.Matrix, 0, 0, leftW, leftH);
-            var topRight = new MatrixView(mat.Matrix, 0, 0, leftW, leftH);
+            var bottomLeft = mat.Sub(0, smallH, smallW, bigH);
+            var topRight = mat.Sub(smallW, 0, bigW, smallH);
 
-            SwapCorners(bottomLeft, topRight);
+            RecursiveSwap(bottomLeft, topRight);
         }
 
         private static void RecursiveSwap(MatrixView bottomLeft, MatrixView topRight) {
             Debug.Assert(bottomLeft.W == topRight.H);
             Debug.Assert(bottomLeft.H == topRight.W);
 
-            if (bottomLeft.W < RecursionStopSize || bottomLeft.H < RecursionStopSize) {
+            if (EndRecursion(bottomLeft)) {
                 SwapCorners(bottomLeft, topRight);
                 return;
             }
@@ -122,8 +170,14 @@ namespace MatrixTranspose {
             int lowH = bottomLeft.H / 2;
             int highH = bottomLeft.H - lowH;
 
-            RecursiveSwap(new MatrixView(bottomLeft.Matrix, ), );
+            RecursiveSwap(bottomLeft.Sub(0, 0, lowW, lowH), topRight.Sub(0, 0, lowH, lowW));
+            RecursiveSwap(bottomLeft.Sub(0, lowH, lowW, highH), topRight.Sub(lowH, 0, highH, lowW));
+            RecursiveSwap(bottomLeft.Sub(lowW, 0, highW, lowH), topRight.Sub(0, lowW, lowH, highW));
+            RecursiveSwap(bottomLeft.Sub(lowW, lowH, highW, highH), topRight.Sub(lowH, lowW, highH, highW));
+        }
 
+        private static bool EndRecursion(MatrixView mat) {
+            return mat.W <= RecursionStopSize || mat.H <= RecursionStopSize || (mat.H < 2 || mat.W < 1);
         }
 
         private static void SwapCorners(MatrixView bottomLeft, MatrixView topRight) {
@@ -146,6 +200,6 @@ namespace MatrixTranspose {
             int tmp = a;
             a = b;
             b = tmp;
-        }
+        }        
     }
 }
