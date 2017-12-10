@@ -75,7 +75,7 @@ namespace MatrixTranspose {
 
 
         private static bool _printSwaps = true;
-        private static readonly int RecursionStopSize = 32;
+        private static readonly int RecursionStopSize = 8;
 
         static void Main(string[] args) {
             //Tests();
@@ -118,10 +118,13 @@ namespace MatrixTranspose {
         }
 
         private static void GenerateSimulatorData(bool useNaive) {
-            for (int k = 54; k < 110; k++) {
+            var watch = new Stopwatch();
+            watch.Start();
+            for (int k = 54; k < 120; k++) {
                 int size = (int) Math.Ceiling(Math.Pow(2, k / 9f));
 
                 var mat = GenerateMatrix(size);
+                Console.Error.WriteLine($"N {k}");
                 Console.WriteLine($"N {size}");
 
                 if (useNaive) {
@@ -131,6 +134,9 @@ namespace MatrixTranspose {
                 }
                 Console.WriteLine("E");
             }
+            watch.Stop();
+
+            Console.Error.WriteLine($"SIM DONE, took: {watch.ElapsedMilliseconds}ms");
         }
 
         private static void Tests() {
