@@ -73,10 +73,23 @@ namespace MatrixTranspose {
             return mat;
         }
 
-        private static readonly int RecursionStopSize = 1;
+
+        private static bool _printSwaps = true;
+        private static readonly int RecursionStopSize = 32;
 
         static void Main(string[] args) {
-            Tests();
+            //Tests();
+
+            if (args.Length != 2) {
+                Console.WriteLine("Usage: cmd.exe NAIVE/OBLIVOUS SIM/MEASURE");
+                return;
+            }
+
+            bool isNaive = args[0] == "NAIVE";
+            GenerateSimulatorData(isNaive);
+            return;
+
+
 
             int k = 9;
 
@@ -104,10 +117,28 @@ namespace MatrixTranspose {
             //CacheOblivousTranspose(mat);
         }
 
+        private static void GenerateSimulatorData(bool useNaive) {
+            for (int k = 54; k < 110; k++) {
+                int size = (int) Math.Ceiling(Math.Pow(2, k / 9f));
+
+                var mat = GenerateMatrix(size);
+                Console.WriteLine($"N {size}");
+
+                if (useNaive) {
+                    NaiveTranspose(MatrixView.FromMatrix(mat));
+                } else {
+                    CacheOblivousTranspose(MatrixView.FromMatrix(mat));
+                }
+                Console.WriteLine("E");
+            }
+        }
+
         private static void Tests() {
             for (int k = 54; k < 120; k++) {
                 Console.WriteLine($"Testik {k}");
+
                 int size = (int) Math.Ceiling(Math.Pow(2, k / 9f));
+
                 var mat = GenerateMatrix(size);
                 var testMat = GenerateMatrix(size);
 
@@ -126,7 +157,7 @@ namespace MatrixTranspose {
 
             for (int i = 0; i < a.GetLength(0); i++) {
                 for (int j = 0; j < a.GetLength(1); j++) {
-                    Debug.Assert(a[i,j] == b[i, j]);
+                    Debug.Assert(a[i, j] == b[i, j]);
                 }
             }
         }
@@ -183,6 +214,9 @@ namespace MatrixTranspose {
         private static void SwapCorners(MatrixView bottomLeft, MatrixView topRight) {
             for (int i = 0; i < bottomLeft.H; i++) {
                 for (int j = 0; j < bottomLeft.W; j++) {
+                    if (_printSwaps) {
+                        Console.WriteLine($"X {bottomLeft.Y + i} {bottomLeft.X + j} {topRight.Y + j} {topRight.X + i}");
+                    }
                     Swap(ref bottomLeft[i, j], ref topRight[j, i]);
                 }
             }
@@ -191,15 +225,19 @@ namespace MatrixTranspose {
         private static void NaiveTranspose(MatrixView mat) {
             for (int i = 0; i < mat.H; i++) {
                 for (int j = 0; j < i; j++) {
+                    if (_printSwaps) {
+                        Console.WriteLine($"X {mat.Y + i} {mat.X + j} {mat.Y + j} {mat.X + i}");
+                    }
                     Swap(ref mat[i, j], ref mat[j, i]);
                 }
             }
         }
 
+
         private static void Swap(ref int a, ref int b) {
             int tmp = a;
             a = b;
             b = tmp;
-        }        
+        }
     }
 }
